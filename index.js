@@ -4,7 +4,7 @@ const fetch = require("node-fetch");
 const cors = require("cors");
 const path = require("path");
 const app = express();
-const PORT = 7023;
+const PORT = 2601 ;
 
 const dbModule = require("./mydb/users");
 const db = dbModule.db;
