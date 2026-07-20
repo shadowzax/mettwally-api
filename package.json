@@ -1,0 +1,25 @@
+{
+  "name": "WEB DB",
+  "version": "1.0.0",
+  "description": "DB-API",
+  "main": "api.js",
+  "scripts": {
+    "start": "node api.js"
+  },
+  "author": "DJN",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "sqlite3": "^5.1.7",
+    "sqlite": "^5.1.1",
+    "lmdb": "*",
+    "cors": "*",
+    "multer": "*",
+    "axios": "*",
+    "nodemailer": "*",
+    "jsonwebtoken": "^9.0.2",
+    "bcrypt": "^5.1.1",
+    "node-fetch": "2.6.7",
+    "cookie-parser": "^1.4.7"
+  }
+}
