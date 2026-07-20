@@ -4,7 +4,7 @@
   "description": "DB-API",
   "main": "api.js",
   "scripts": {
-    "start": "node api.js"
+    "start": "node index.js"
   },
   "author": "DJN",
   "license": "ISC",
