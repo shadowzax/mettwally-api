@@ -670,13 +670,16 @@ router.get("/course/:id/init-sections", (req, res) => {
             const sectionId = Date.now();
             const now = new Date().toISOString();
 
+            // إضافة الدرس الأول فقط
             sections.push({
                 id: sectionId,
-                name: "الوحدة الاول",
-                description: "رياضيات",
+                name: "الدرس الأول: تفاضل - الاشتقاق الضمني والبارامتري",
+                description:
+                    "شرح الاشتقاق الضمني والاشتقاق البارامتري في التفاضل لطلاب الصف الثالث الثانوي",
                 current_index: sections.length + 1,
                 created_at: now,
                 updated_at: now,
+
                 sectionables: [
                     {
                         id: sectionId + 1,
@@ -684,42 +687,29 @@ router.get("/course/:id/init-sections", (req, res) => {
                         group_name: "الدرس الأول",
                         sectionable_id: 101,
                         section_id: sectionId,
+
                         view_limit: 0,
                         exam_finish_limit: 0,
                         exam_open_limit: 0,
                         exam_resume_limit: 0,
+
                         visible_from: now,
                         visible_to: "2035-01-01T00:00:00.000Z",
+
                         index: 1,
                         is_locked_on: 0,
+
                         sectionable: {
                             id: 101,
-                            name: "الوحده الاولي الدرس الاول",
-                            description: "الوحده الاولي الدرس الاول",
+                            name:
+                                "الدرس الأول: تفاضل - الاشتقاق الضمني والبارامتري",
+                            description:
+                                "شرح الاشتقاق الضمني والاشتقاق البارامتري في التفاضل لطلاب الصف الثالث الثانوي",
                             duration: 25,
                             platform: "youtube",
-                            source: "zJrThdvh3zM"
-                        }
-                    },
-                    {
-                        id: sectionId + 2,
-                        sectionable_type: "book",
-                        group_name: "الدرس الأول",
-                        sectionable_id: 201,
-                        section_id: sectionId,
-                        view_limit: 0,
-                        exam_finish_limit: 0,
-                        exam_open_limit: 0,
-                        exam_resume_limit: 0,
-                        visible_from: now,
-                        visible_to: "2035-01-01T00:00:00.000Z",
-                        index: 2,
-                        is_locked_on: 0,
-                        sectionable: {
-                            id: 201,
-                            name: "ملخص الدرس",
-                            description: "ملخص الدرس",
-                            source: "https://files.catbox.moe/ky7lga.pdf"
+
+                            // YouTube Video ID
+                            source: "ZaaB2VWU87M"
                         }
                     }
                 ]
@@ -758,4 +748,5 @@ router.get("/course/:id/init-sections", (req, res) => {
         }
     );
 });
+
 module.exports = router;
