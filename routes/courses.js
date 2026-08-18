@@ -3,7 +3,70 @@ const jwt = require("jsonwebtoken");
 const router = express.Router();
 const { db: coursesDb } = require("../mydb/courses");
 const { db: usersDb } = require("../mydb/users");
+router.get("/course/:courseId/lesson/:lessonId", (req, res) => {
+    const courseId = parseInt(req.params.courseId, 10);
+    const lessonId = parseInt(req.params.lessonId, 10);
 
+    if (isNaN(courseId) || isNaN(lessonId)) {
+        return res.status(400).json({
+            success: false,
+            error: "Invalid course or lesson id"
+        });
+    }
+
+    coursesDb.get(
+        "SELECT sections FROM courses WHERE id = ?",
+        [courseId],
+        (err, course) => {
+            if (err) {
+                return res.status(500).json({
+                    success: false,
+                    error: err.message
+                });
+            }
+
+            if (!course) {
+                return res.status(404).json({
+                    success: false,
+                    error: "Course not found"
+                });
+            }
+
+            let sections;
+
+            try {
+                sections = JSON.parse(course.sections || "[]");
+            } catch (err) {
+                return res.status(500).json({
+                    success: false,
+                    error: "Invalid course sections data"
+                });
+            }
+
+            for (const section of sections) {
+                if (!Array.isArray(section.sectionables)) continue;
+
+                const lesson = section.sectionables.find(
+                    item =>
+                        item.sectionable_type === "video" &&
+                        Number(item.sectionable_id) === lessonId
+                );
+
+                if (lesson) {
+                    return res.status(200).json({
+                        success: true,
+                        lesson
+                    });
+                }
+            }
+
+            return res.status(404).json({
+                success: false,
+                error: "Lesson not found"
+            });
+        }
+    );
+});
 router.get("/purchased-courses", (req, res) => {
     const authHeader = req.headers.authorization;
 
@@ -670,16 +733,13 @@ router.get("/course/:id/init-sections", (req, res) => {
             const sectionId = Date.now();
             const now = new Date().toISOString();
 
-            // إضافة الدرس الأول فقط
             sections.push({
                 id: sectionId,
-                name: "الدرس الأول: تفاضل - الاشتقاق الضمني والبارامتري",
-                description:
-                    "شرح الاشتقاق الضمني والاشتقاق البارامتري في التفاضل لطلاب الصف الثالث الثانوي",
+                name: "الوحدة الاول",
+                description: "رياضيات",
                 current_index: sections.length + 1,
                 created_at: now,
                 updated_at: now,
-
                 sectionables: [
                     {
                         id: sectionId + 1,
@@ -687,29 +747,42 @@ router.get("/course/:id/init-sections", (req, res) => {
                         group_name: "الدرس الأول",
                         sectionable_id: 101,
                         section_id: sectionId,
-
                         view_limit: 0,
                         exam_finish_limit: 0,
                         exam_open_limit: 0,
                         exam_resume_limit: 0,
-
                         visible_from: now,
                         visible_to: "2035-01-01T00:00:00.000Z",
-
                         index: 1,
                         is_locked_on: 0,
-
                         sectionable: {
                             id: 101,
-                            name:
-                                "الدرس الأول: تفاضل - الاشتقاق الضمني والبارامتري",
-                            description:
-                                "شرح الاشتقاق الضمني والاشتقاق البارامتري في التفاضل لطلاب الصف الثالث الثانوي",
+                            name: "الوحده الاولي الدرس الاول",
+                            description: "الوحده الاولي الدرس الاول",
                             duration: 25,
                             platform: "youtube",
-
-                            // YouTube Video ID
-                            source: "ZaaB2VWU87M"
+                            source: "zUG6Cx3K4kY"
+                        }
+                    },
+                    {
+                        id: sectionId + 2,
+                        sectionable_type: "book",
+                        group_name: "الدرس الأول",
+                        sectionable_id: 201,
+                        section_id: sectionId,
+                        view_limit: 0,
+                        exam_finish_limit: 0,
+                        exam_open_limit: 0,
+                        exam_resume_limit: 0,
+                        visible_from: now,
+                        visible_to: "2035-01-01T00:00:00.000Z",
+                        index: 2,
+                        is_locked_on: 0,
+                        sectionable: {
+                            id: 201,
+                            name: "ملخص الدرس",
+                            description: "ملخص الدرس",
+                            source: "https://files.catbox.moe/ky7lga.pdf"
                         }
                     }
                 ]
@@ -748,5 +821,4 @@ router.get("/course/:id/init-sections", (req, res) => {
         }
     );
 });
-
 module.exports = router;
