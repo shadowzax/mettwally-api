@@ -19,7 +19,7 @@ app.get("/", (req, res) => {
 });
 /*------------------------------------------------*/
 
-const routes = ["auth","courses","admin/users","admin/assistant","admin/courses"];
+const routes = ["auth","courses","admin/users","admin/assistant","admin/courses","admin/codes","codes"];
 
 routes.forEach(route => {
     app.use(`/api/${route}`, require(`./routes/${route}`));
