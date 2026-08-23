@@ -24,12 +24,49 @@ function generateRandomValue() {
 
 router.get("/generate", async (req, res) => {
     try {
-        const course_id = req.query.course_id || null;
+        const { value, count, course_id = null } = req.query;
+
+        if (
+            value === undefined ||
+            value === null ||
+            value === "" ||
+            isNaN(Number(value)) ||
+            Number(value) <= 0
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "القيمة مطلوبة ويجب أن تكون أكبر من صفر"
+            });
+        }
+
+        if (
+            count === undefined ||
+            count === null ||
+            count === "" ||
+            isNaN(Number(count)) ||
+            !Number.isInteger(Number(count)) ||
+            Number(count) <= 0
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "عدد الأكواد مطلوب ويجب أن يكون رقمًا صحيحًا أكبر من صفر"
+            });
+        }
+
+        const codeValue = Number(value);
+        const codeCount = Number(count);
+
+        if (codeCount > 10000) {
+            return res.status(400).json({
+                success: false,
+                message: "الحد الأقصى لإنشاء الأكواد هو 10000 كود"
+            });
+        }
+
         const codes = [];
 
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < codeCount; i++) {
             const code = await generateCode();
-            const value = generateRandomValue();
 
             await new Promise((resolve, reject) => {
                 db.run(
@@ -43,8 +80,8 @@ router.get("/generate", async (req, res) => {
                     `,
                     [
                         code,
-                        value,
-                        course_id
+                        codeValue,
+                        course_id || null
                     ],
                     function (err) {
                         if (err) {
@@ -53,8 +90,8 @@ router.get("/generate", async (req, res) => {
 
                         codes.push({
                             code,
-                            value,
-                            course_id,
+                            value: codeValue,
+                            course_id: course_id || null,
                             is_used: 0,
                             used_by: null,
                             used_at: null
@@ -68,8 +105,10 @@ router.get("/generate", async (req, res) => {
 
         return res.status(201).json({
             success: true,
-            message: "تم إنشاء 10 أكواد بنجاح",
+            message: `تم إنشاء ${codes.length} كود بنجاح`,
             count: codes.length,
+            value: codeValue,
+            course_id: course_id || null,
             codes
         });
 
@@ -83,7 +122,6 @@ router.get("/generate", async (req, res) => {
         });
     }
 });
-
 router.get("/codes", (req, res) => {
     db.all(
         `
