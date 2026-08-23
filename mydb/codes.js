@@ -52,7 +52,9 @@ db.serialize(() => {
         CREATE INDEX IF NOT EXISTS idx_user_codes_is_used
         ON user_codes(is_used)
     `, (err) => {
-        console.error("Error creating is_used index:", err.message);
+        if (err) {
+            console.error("Error creating is_used index:", err.message);
+        }
     });
 
     db.run(`
