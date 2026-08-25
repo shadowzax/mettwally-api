@@ -155,25 +155,11 @@ router.post("/course", upload.single("image"), async (req, res) => {
         });
     }
 });
+/*----------------------------------------------------*/
 router.get("/courses", (req, res) => {
     db.all(
         `
-        SELECT
-            id,
-            name,
-            description,
-            image,
-            price,
-            price_before_discount,
-            commission,
-            year,
-            first_free_video,
-            is_to_send_parent_follow_up_message,
-            is_pinned,
-            prepaidable,
-            is_couponable,
-            sellable,
-            is_course_featured
+        SELECT *
         FROM courses
         ORDER BY id DESC
         `,
@@ -189,34 +175,172 @@ router.get("/courses", (req, res) => {
             return res.status(200).json({
                 success: true,
                 count: courses.length,
-                courses
+                courses: courses || []
             });
         }
     );
 });
+router.post("/courses/delete", (req, res) => {
+    const id = parseInt(req.body.id, 10);
 
-router.get("/courses/delete", (req, res) => {
-    db.run("DELETE FROM courses", function (err) {
-        if (err) {
-            return res.status(500).json({
-                success: false,
-                error: err.message
-            });
-        }
+    if (isNaN(id) || id <= 0) {
+        return res.status(400).json({
+            success: false,
+            error: "Invalid course id"
+        });
+    }
 
-        db.run("DELETE FROM sqlite_sequence WHERE name = 'courses'", (resetErr) => {
-            if (resetErr) {
+    db.run(
+        "DELETE FROM courses WHERE id = ?",
+        [id],
+        function (err) {
+            if (err) {
                 return res.status(500).json({
                     success: false,
-                    error: resetErr.message
+                    error: err.message
+                });
+            }
+
+            if (this.changes === 0) {
+                return res.status(404).json({
+                    success: false,
+                    error: "Course not found"
                 });
             }
 
             return res.status(200).json({
                 success: true,
-                message: "All courses deleted successfully"
+                message: "Course deleted successfully",
+                deleted_id: id
             });
+        }
+    );
+});
+/*-------------------------------------------*/
+router.post("/course/:id/sections", (req, res) => {
+    const courseId = parseInt(req.params.id, 10);
+
+    if (isNaN(courseId) || courseId <= 0) {
+        return res.status(400).json({
+            success: false,
+            error: "Invalid course id"
         });
-    });
+    }
+
+    const {
+        name = "الوحدة الجديدة",
+        description = "",
+        sectionables = []
+    } = req.body;
+
+    if (!Array.isArray(sectionables)) {
+        return res.status(400).json({
+            success: false,
+            error: "sectionables must be an array"
+        });
+    }
+
+    coursesDb.get(
+        "SELECT * FROM courses WHERE id = ?",
+        [courseId],
+        (err, course) => {
+            if (err) {
+                return res.status(500).json({
+                    success: false,
+                    error: err.message
+                });
+            }
+
+            if (!course) {
+                return res.status(404).json({
+                    success: false,
+                    error: "Course not found"
+                });
+            }
+
+            let sections = [];
+
+            try {
+                sections = course.sections
+                    ? JSON.parse(course.sections)
+                    : [];
+            } catch (error) {
+                sections = [];
+            }
+
+            if (!Array.isArray(sections)) {
+                sections = [];
+            }
+
+            const now = new Date().toISOString();
+            const sectionId = Date.now();
+
+            const newSection = {
+                id: sectionId,
+                name: String(name),
+                description: String(description),
+                current_index: sections.length + 1,
+                created_at: now,
+                updated_at: now,
+                sectionables: []
+            };
+
+            sectionables.forEach((item, index) => {
+                const sectionableId = sectionId + index + 1;
+
+                newSection.sectionables.push({
+                    id: sectionableId,
+                    sectionable_type: item.sectionable_type || "video",
+                    group_name: item.group_name || "",
+                    sectionable_id: item.sectionable_id || sectionableId,
+                    section_id: sectionId,
+                    view_limit: Number(item.view_limit) || 0,
+                    exam_finish_limit: Number(item.exam_finish_limit) || 0,
+                    exam_open_limit: Number(item.exam_open_limit) || 0,
+                    exam_resume_limit: Number(item.exam_resume_limit) || 0,
+                    visible_from: item.visible_from || now,
+                    visible_to: item.visible_to || "2035-01-01T00:00:00.000Z",
+                    index: index + 1,
+                    is_locked_on: Number(item.is_locked_on) || 0,
+                    sectionable: item.sectionable || {}
+                });
+            });
+
+            sections.push(newSection);
+
+            coursesDb.run(
+                "UPDATE courses SET sections = ? WHERE id = ?",
+                [JSON.stringify(sections), courseId],
+                function (err) {
+                    if (err) {
+                        return res.status(500).json({
+                            success: false,
+                            error: err.message
+                        });
+                    }
+
+                    coursesDb.get(
+                        "SELECT * FROM courses WHERE id = ?",
+                        [courseId],
+                        (err, updatedCourse) => {
+                            if (err) {
+                                return res.status(500).json({
+                                    success: false,
+                                    error: err.message
+                                });
+                            }
+
+                            return res.status(201).json({
+                                success: true,
+                                message: "Section added successfully",
+                                section: newSection,
+                                course: updatedCourse
+                            });
+                        }
+                    );
+                }
+            );
+        }
+    );
 });
 module.exports = router;
