@@ -1,12 +1,13 @@
 const express = require("express");
 const { db } = require("../../mydb/courses");
-
 const router = express.Router();
+
 const multer = require("multer");
 const upload = multer({ dest: "uploads/" });
 const fs = require("fs");
 const API_KEY = "cd3664692e0290e136732602b869ba5e";
 const axios = require("axios");
+
 async function uploadImage(filePath, expiration = 0) {
     const image = fs.readFileSync(filePath);
     const base64Image = image.toString("base64");
@@ -180,6 +181,46 @@ router.get("/courses", (req, res) => {
         }
     );
 });
+router.get("/courses/:id", (req, res) => {
+    const id = Number(req.params.id);
+
+    if (!Number.isInteger(id) || id <= 0) {
+        return res.status(400).json({
+            success: false,
+            message: "معرف الكورس غير صحيح"
+        });
+    }
+
+    db.get(
+        `
+        SELECT *
+        FROM courses
+        WHERE id = ?
+        `,
+        [id],
+        (err, course) => {
+            if (err) {
+                return res.status(500).json({
+                    success: false,
+                    error: err.message
+                });
+            }
+
+            if (!course) {
+                return res.status(404).json({
+                    success: false,
+                    message: "الكورس غير موجود"
+                });
+            }
+
+            return res.status(200).json({
+                success: true,
+                count: 1,
+                courses: [course]
+            });
+        }
+    );
+});
 router.post("/courses/delete", (req, res) => {
     const id = parseInt(req.body.id, 10);
 
@@ -216,8 +257,499 @@ router.post("/courses/delete", (req, res) => {
         }
     );
 });
-/*-------------------------------------------*/
+
 router.post("/course/:id/sections", (req, res) => {
+    const courseId = parseInt(req.params.id, 10);
+
+    if (isNaN(courseId) || courseId <= 0) {
+        return res.status(400).json({
+            success: false,
+            error: "Invalid course id"
+        });
+    }
+
+    const { name, description } = req.body;
+
+    if (!name || !String(name).trim()) {
+        return res.status(400).json({
+            success: false,
+            error: "Section name is required"
+        });
+    }
+
+    if (!description || !String(description).trim()) {
+        return res.status(400).json({
+            success: false,
+            error: "Section description is required"
+        });
+    }
+
+    db.get(
+        "SELECT * FROM courses WHERE id = ?",
+        [courseId],
+        (err, course) => {
+            if (err) {
+                return res.status(500).json({
+                    success: false,
+                    error: err.message
+                });
+            }
+
+            if (!course) {
+                return res.status(404).json({
+                    success: false,
+                    error: "Course not found"
+                });
+            }
+
+            let sections = [];
+
+            try {
+                sections = course.sections
+                    ? JSON.parse(course.sections)
+                    : [];
+            } catch (error) {
+                sections = [];
+            }
+
+            if (!Array.isArray(sections)) {
+                sections = [];
+            }
+
+            const now = new Date().toISOString();
+            const sectionId = Date.now();
+
+            const newSection = {
+                id: sectionId,
+                name: String(name).trim(),
+                description: String(description).trim(),
+                current_index: sections.length + 1,
+                created_at: now,
+                updated_at: now,
+                sectionables: []
+            };
+
+            sections.push(newSection);
+
+            db.run(
+                "UPDATE courses SET sections = ? WHERE id = ?",
+                [JSON.stringify(sections), courseId],
+                function (err) {
+                    if (err) {
+                        return res.status(500).json({
+                            success: false,
+                            error: err.message
+                        });
+                    }
+
+                    return res.status(201).json({
+                        success: true,
+                        message: "Section added successfully",
+                        section: newSection
+                    });
+                }
+            );
+        }
+    );
+});
+
+router.post("/courses/:id/sections/:sectionId/sectionables", (req, res) => {
+    const courseId = parseInt(req.params.id, 10);
+    const sectionId = parseInt(req.params.sectionId, 10);
+
+    if (isNaN(courseId) || courseId <= 0) {
+        return res.status(400).json({
+            success: false,
+            error: "Invalid course id"
+        });
+    }
+
+    if (isNaN(sectionId) || sectionId <= 0) {
+        return res.status(400).json({
+            success: false,
+            error: "Invalid section id"
+        });
+    }
+
+    const {
+        type,
+        name,
+        description
+    } = req.body;
+
+    if (!type) {
+        return res.status(400).json({
+            success: false,
+            error: "Type is required"
+        });
+    }
+
+    if (!["video", "pdf", "exam"].includes(type)) {
+        return res.status(400).json({
+            success: false,
+            error: "Type must be video, pdf or exam"
+        });
+    }
+
+    if (!name || !String(name).trim()) {
+        return res.status(400).json({
+            success: false,
+            error: "Name is required"
+        });
+    }
+
+    if (!description || !String(description).trim()) {
+        return res.status(400).json({
+            success: false,
+            error: "Description is required"
+        });
+    }
+
+    if (type === "video" && (!req.body.source || !String(req.body.source).trim())) {
+        return res.status(400).json({
+            success: false,
+            error: "Source is required for video"
+        });
+    }
+
+    if (type === "pdf" && (!req.body.file_url || !String(req.body.file_url).trim())) {
+        return res.status(400).json({
+            success: false,
+            error: "File URL is required for pdf"
+        });
+    }
+
+    if (type === "exam" && (!req.body.exam_id || !String(req.body.exam_id).trim())) {
+        return res.status(400).json({
+            success: false,
+            error: "Exam ID is required for exam"
+        });
+    }
+
+    db.get(
+        "SELECT * FROM courses WHERE id = ?",
+        [courseId],
+        (err, course) => {
+            if (err) {
+                return res.status(500).json({
+                    success: false,
+                    error: err.message
+                });
+            }
+
+            if (!course) {
+                return res.status(404).json({
+                    success: false,
+                    error: "Course not found"
+                });
+            }
+
+            let sections = [];
+
+            try {
+                sections = course.sections
+                    ? JSON.parse(course.sections)
+                    : [];
+            } catch (error) {
+                sections = [];
+            }
+
+            if (!Array.isArray(sections)) {
+                sections = [];
+            }
+
+            const sectionIndex = sections.findIndex(
+                section => Number(section.id) === sectionId
+            );
+
+            if (sectionIndex === -1) {
+                return res.status(404).json({
+                    success: false,
+                    error: "Section not found"
+                });
+            }
+
+            if (!Array.isArray(sections[sectionIndex].sectionables)) {
+                sections[sectionIndex].sectionables = [];
+            }
+
+            const now = new Date().toISOString();
+            const sectionableId = Date.now();
+
+            const sectionable = {
+                id: sectionableId,
+                name: String(name).trim(),
+                description: String(description).trim(),
+                sectionable_type: type,
+                section_id: sectionId,
+                index: sections[sectionIndex].sectionables.length + 1,
+                created_at: now,
+                updated_at: now
+            };
+
+            if (type === "video") {
+                sectionable.source = String(req.body.source).trim();
+            }
+
+            if (type === "pdf") {
+                sectionable.file_url = String(req.body.file_url).trim();
+            }
+
+            if (type === "exam") {
+                sectionable.exam_id = String(req.body.exam_id).trim();
+            }
+
+            sections[sectionIndex].sectionables.push(sectionable);
+            sections[sectionIndex].updated_at = now;
+
+            db.run(
+                "UPDATE courses SET sections = ? WHERE id = ?",
+                [JSON.stringify(sections), courseId],
+                function (err) {
+                    if (err) {
+                        return res.status(500).json({
+                            success: false,
+                            error: err.message
+                        });
+                    }
+
+                    return res.status(201).json({
+                        success: true,
+                        message: "Sectionable added successfully",
+                        sectionable: sectionable
+                    });
+                }
+            );
+        }
+    );
+});
+router.delete("/course/:id/sections/:sectionId/sectionables/:sectionableId", (req, res) => {
+    const courseId = parseInt(req.params.id, 10);
+    const sectionId = parseInt(req.params.sectionId, 10);
+    const sectionableId = parseInt(req.params.sectionableId, 10);
+
+    const { password } = req.body;
+
+    if (password !== "01063") {
+        return res.status(401).json({
+            success: false,
+            error: "Invalid password"
+        });
+    }
+
+    if (isNaN(courseId) || courseId <= 0) {
+        return res.status(400).json({
+            success: false,
+            error: "Invalid course id"
+        });
+    }
+
+    if (isNaN(sectionId) || sectionId <= 0) {
+        return res.status(400).json({
+            success: false,
+            error: "Invalid section id"
+        });
+    }
+
+    if (isNaN(sectionableId) || sectionableId <= 0) {
+        return res.status(400).json({
+            success: false,
+            error: "Invalid sectionable id"
+        });
+    }
+
+    db.get(
+        "SELECT * FROM courses WHERE id = ?",
+        [courseId],
+        (err, course) => {
+            if (err) {
+                return res.status(500).json({
+                    success: false,
+                    error: err.message
+                });
+            }
+
+            if (!course) {
+                return res.status(404).json({
+                    success: false,
+                    error: "Course not found"
+                });
+            }
+
+            let sections = [];
+
+            try {
+                sections = course.sections
+                    ? JSON.parse(course.sections)
+                    : [];
+            } catch (error) {
+                sections = [];
+            }
+
+            if (!Array.isArray(sections)) {
+                sections = [];
+            }
+
+            const sectionIndex = sections.findIndex(
+                section => Number(section.id) === sectionId
+            );
+
+            if (sectionIndex === -1) {
+                return res.status(404).json({
+                    success: false,
+                    error: "Section not found"
+                });
+            }
+
+            const section = sections[sectionIndex];
+
+            if (!Array.isArray(section.sectionables)) {
+                section.sectionables = [];
+            }
+
+            const sectionableIndex = section.sectionables.findIndex(
+                item => Number(item.id) === sectionableId
+            );
+
+            if (sectionableIndex === -1) {
+                return res.status(404).json({
+                    success: false,
+                    error: "Sectionable not found"
+                });
+            }
+
+            const deletedSectionable = section.sectionables.splice(
+                sectionableIndex,
+                1
+            )[0];
+
+            section.sectionables.forEach((item, index) => {
+                item.index = index + 1;
+            });
+
+            section.updated_at = new Date().toISOString();
+
+            db.run(
+                "UPDATE courses SET sections = ? WHERE id = ?",
+                [JSON.stringify(sections), courseId],
+                function (err) {
+                    if (err) {
+                        return res.status(500).json({
+                            success: false,
+                            error: err.message
+                        });
+                    }
+
+                    return res.status(200).json({
+                        success: true,
+                        message: "Sectionable deleted successfully",
+                        sectionable: deletedSectionable
+                    });
+                }
+            );
+        }
+    );
+});
+
+router.delete("/course/:id/sections/:sectionId", (req, res) => {
+    const courseId = parseInt(req.params.id, 10);
+    const sectionId = parseInt(req.params.sectionId, 10);
+
+    const { password } = req.body;
+
+    if (password !== "01063") {
+        return res.status(401).json({
+            success: false,
+            error: "Invalid password"
+        });
+    }
+
+    if (isNaN(courseId) || courseId <= 0) {
+        return res.status(400).json({
+            success: false,
+            error: "Invalid course id"
+        });
+    }
+
+    if (isNaN(sectionId) || sectionId <= 0) {
+        return res.status(400).json({
+            success: false,
+            error: "Invalid section id"
+        });
+    }
+
+    db.get(
+        "SELECT * FROM courses WHERE id = ?",
+        [courseId],
+        (err, course) => {
+            if (err) {
+                return res.status(500).json({
+                    success: false,
+                    error: err.message
+                });
+            }
+
+            if (!course) {
+                return res.status(404).json({
+                    success: false,
+                    error: "Course not found"
+                });
+            }
+
+            let sections = [];
+
+            try {
+                sections = course.sections
+                    ? JSON.parse(course.sections)
+                    : [];
+            } catch (error) {
+                sections = [];
+            }
+
+            if (!Array.isArray(sections)) {
+                sections = [];
+            }
+
+            const sectionIndex = sections.findIndex(
+                section => Number(section.id) === sectionId
+            );
+
+            if (sectionIndex === -1) {
+                return res.status(404).json({
+                    success: false,
+                    error: "Section not found"
+                });
+            }
+
+            const deletedSection = sections.splice(sectionIndex, 1)[0];
+
+            sections.forEach((section, index) => {
+                section.current_index = index + 1;
+            });
+
+            db.run(
+                "UPDATE courses SET sections = ? WHERE id = ?",
+                [JSON.stringify(sections), courseId],
+                function (err) {
+                    if (err) {
+                        return res.status(500).json({
+                            success: false,
+                            error: err.message
+                        });
+                    }
+
+                    return res.status(200).json({
+                        success: true,
+                        message: "Section deleted successfully",
+                        section: deletedSection
+                    });
+                }
+            );
+        }
+    );
+});
+/*-------------------------------------------*/
+router.post("/courses/:id/sections", (req, res) => {
     const courseId = parseInt(req.params.id, 10);
 
     if (isNaN(courseId) || courseId <= 0) {
